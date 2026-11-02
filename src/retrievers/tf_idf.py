@@ -2,6 +2,7 @@ from src.data_utils.document import Document
 from src.retrievers.base_retriever import Retriever
 import numpy as np
 from scipy.sparse import lil_matrix
+import re
 
 
 class TFIDF(Retriever):
@@ -18,19 +19,22 @@ class TFIDF(Retriever):
         """
         Remove unwanted charatcters from text and lowercase
         """
-        raise NotImplementedError()
-        
+        text = text.lower()
+
+        cleaned = "".join(char for char in text if char.isalnum() or char.isspace())
+
+        return cleaned.split()        
     def GetQueryVocabulary(self, query: str) -> list[str]:
         """
         Returns all unique words in a query
         """
-        raise NotImplementedError()
+        return self.PreprocessText(query)
 
     def GetDocumentVocabulary(self, document: Document) -> list[str]:
         """
         Returns all unique words in a document
         """
-        raise NotImplementedError()
+        return self.PreprocessText(document.GetText())
     
     def GetCorpusVocabulary(self) -> set[str]:
         """
@@ -45,21 +49,41 @@ class TFIDF(Retriever):
         """
         Returns a dict with terms and counts of how many documents the term occurs in (counted once per document).
         """
-        raise NotImplementedError()
+        df = {}
+        df = {word: 0 for word in self.corpus_vocabulary}
+
+        for doc in self.index.GetDocuments():
+            text = set(self.GetDocumentVocabulary(doc))
+            for word in set(self.GetDocumentVocabulary(doc)):   # set -> once per document
+                df[word] += 1
+
+        return df
        
     
     def GetInverseDocumentFrequencies(self) -> dict[str, float]:
         """
         Returns a dict with terms and their corresponding inverse document frequencies.
         """
-        raise NotImplementedError()
+        idf = self.GetDocumentFrequencies()
+        N = len(self.index.GetDocuments())
+
+        for word in self.corpus_vocabulary:
+            idf[word] = np.log(N/idf[word])
+
+
+        return idf
     
     
     def GetDocumentTermCounts(self, document: Document):
         """
         Returns a dict on the form {term: num_occurences} for an input Document.
         """
-        raise NotImplementedError()
+        term_counts = {word: 0 for word in self.corpus_vocabulary}
+        for word in self.GetDocumentVocabulary(document):
+            term_counts[word] += 1
+
+
+        return term_counts
 
     def GetDocumentsTFIDFVectors(self):
         """
@@ -72,8 +96,22 @@ class TFIDF(Retriever):
         n_documents = len(self.index.GetDocuments())
         n_terms = len(self.corpus_vocabulary)
         tfidf_matrix = lil_matrix((n_documents, n_terms), dtype=np.float32)
+        from tqdm import tqdm
 
-        # TODO: Add tf-idf code
+        for i, doc in tqdm(enumerate(self.index.GetDocuments())):
+            doc_indexes = [self.term_to_index[word] for word in self.GetDocumentVocabulary(doc)]
+
+            for doc_index in doc_indexes:
+                tfidf_matrix[i, doc_index] += 1
+
+            for term in set(self.GetDocumentVocabulary(doc)):
+                tfidf_matrix[i, self.term_to_index[term]] = tfidf_matrix[i, self.term_to_index[term]] * self.idf[term]
+
+
+
+
+
+
         
         return tfidf_matrix.tocsr()   # Convert to CSR format for efficient row slicing
     
@@ -88,7 +126,13 @@ class TFIDF(Retriever):
         """
         query_vector = lil_matrix((len(queries), len(self.corpus_vocabulary)), dtype=np.float32)
 
-        # TODO: add code
+        for i, query in enumerate(queries):
+            query_vocab = self.GetQueryVocabulary(query)
+            query_index = [self.term_to_index[word] for word in query_vocab if word in self.term_to_index]
+
+            for index in query_index:
+                query_vector[i, index] = +1
+        
 
         return query_vector.tocsr()
 
