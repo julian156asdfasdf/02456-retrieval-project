@@ -98,14 +98,17 @@ class TFIDF(Retriever):
         tfidf_matrix = lil_matrix((n_documents, n_terms), dtype=np.float32)
         from tqdm import tqdm
 
+        self.doc_max_freq = {}
         for i, doc in tqdm(enumerate(self.index.GetDocuments())):
             doc_indexes = [self.term_to_index[word] for word in self.GetDocumentVocabulary(doc)]
+
+            self.doc_max_freq[i] = max(self.GetDocumentTermCounts(doc).values())
 
             for doc_index in doc_indexes:
                 tfidf_matrix[i, doc_index] += 1
 
             for term in set(self.GetDocumentVocabulary(doc)):
-                tfidf_matrix[i, self.term_to_index[term]] = tfidf_matrix[i, self.term_to_index[term]] * self.idf[term]
+                tfidf_matrix[i, self.term_to_index[term]] = (tfidf_matrix[i, self.term_to_index[term]]/self.doc_max_freq[i]) * self.idf[term]
 
 
 
