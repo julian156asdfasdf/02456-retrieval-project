@@ -2,6 +2,7 @@ from scipy.sparse import lil_matrix
 from src.retrievers.tf_idf import TFIDF
 from src.data_utils.document import Document
 import numpy as np
+from tqdm import tqdm
 
 class BM25(TFIDF):
     def __init__(self, documents: list[dict] = None, index_path: str = None, k1: float = 1.5, b: float = 0.75) -> None:
@@ -46,7 +47,6 @@ class BM25(TFIDF):
         n_documents = len(self.index.GetDocuments())
         n_terms = len(self.corpus_vocabulary)
         bm25_matrix = lil_matrix((n_documents, n_terms), dtype=np.float32)
-        from tqdm import tqdm
 
         for i, doc in tqdm(enumerate(self.index.GetDocuments())):
             doc_indexes = [self.term_to_index[word] for word in self.GetDocumentVocabulary(doc)]

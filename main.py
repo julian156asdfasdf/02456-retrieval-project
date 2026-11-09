@@ -30,9 +30,12 @@ def main(cfg):
                            ) 
                         for idx in range(corpus.test.num_rows)
                     ]
-    
+
+
     ### Initialize TF-IDF class
     tf_idf = TFIDF(documents=corpus.all_documents)
+    
+    
     
     ### Retrieve top-k relevant queries
     tfidf_train_relevancies = retrieveQueryAndGetRelevancies(tf_idf, train_queries, k=cfg.top_k)

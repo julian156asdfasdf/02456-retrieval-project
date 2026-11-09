@@ -1,7 +1,8 @@
 from src.data_utils.document import Document
 from src.retrievers.base_retriever import Retriever
-import numpy as np
 from scipy.sparse import lil_matrix
+from tqdm import tqdm
+import numpy as np
 import re
 
 
@@ -96,7 +97,6 @@ class TFIDF(Retriever):
         n_documents = len(self.index.GetDocuments())
         n_terms = len(self.corpus_vocabulary)
         tfidf_matrix = lil_matrix((n_documents, n_terms), dtype=np.float32)
-        from tqdm import tqdm
 
         self.doc_max_freq = {}
         for i, doc in tqdm(enumerate(self.index.GetDocuments())):
@@ -109,12 +109,6 @@ class TFIDF(Retriever):
 
             for term in set(self.GetDocumentVocabulary(doc)):
                 tfidf_matrix[i, self.term_to_index[term]] = (tfidf_matrix[i, self.term_to_index[term]]/self.doc_max_freq[i]) * self.idf[term]
-
-
-
-
-
-
         
         return tfidf_matrix.tocsr()   # Convert to CSR format for efficient row slicing
     
