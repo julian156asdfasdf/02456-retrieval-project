@@ -5,13 +5,14 @@ import transformers
 import math
 
 class TransformerEncoder(nn.Module):
-    def __init__(self, n_layers: int, n_heads: int, emb_dim: int, hidden_dim: int, feed_forward_dim: int):
+    def __init__(self, n_layers: int, n_heads: int, emb_dim: int, hidden_dim: int, feed_forward_dim: int, batch_size=32):
         super().__init__()
         self.n_layers = n_layers
         self.n_heads = n_heads
         self.emb_dim = emb_dim
         self.hidden_dim = hidden_dim
         self.feed_forward_dim = feed_forward_dim
+        self.batch_size = batch_size
 
         self.setup_model()
 
@@ -20,14 +21,13 @@ class TransformerEncoder(nn.Module):
         """
         Instantiate the model.
         """
-        
         self.tokenizer = transformers.AutoTokenizer.from_pretrained("bert-base-cased")
         self.embeddings = nn.Embedding(30522, self.emb_dim)
         self.pe = PositionalEncoding(self.emb_dim, 0.1)
         self.multi_headed_attention = MultiHeadedAttention(self.n_heads, self.emb_dim)
         self.layer_normalizer_1 = nn.LayerNorm(self.emb_dim)
         self.layer_normalizer_2 = nn.LayerNorm(self.emb_dim)
-        self.linear_feed_forwarder = nn.Linear(self.emb_dim, self.hidden_dim)
+        self.linear_feed_forwarder = nn.Linear(self.emb_dim, self.emb_dim)
         
 
 
@@ -38,17 +38,16 @@ class TransformerEncoder(nn.Module):
         """
         if self.cfg.model.pooling_type == 'cls': # type: ignore
             # cls is the first token of each sequence
-            output = x[:,0,:]
+            pooled_vec = x[:,0,:]
             
         elif self.cfg.model.pooling_type == 'max': # type: ignore
-            max_pooler = nn.MaxPool2d(1, stride=1)
-            output = max_pooler(x)
+            pooled_vec = x.max(dim=1)
 
         elif self.cfg.model.pooling_type == 'mean': # type: ignore
-            avg_pooler = nn.AvgPool2d(1, stride=1)
-            output = avg_pooler(x)
+            pooled_vec = x.mean(dim=1)
 
-        return output
+
+        return pooled_vec
 
 
     def encode_this_now(self, x):
@@ -56,11 +55,9 @@ class TransformerEncoder(nn.Module):
         Run a forward pass on the model
         """
         
-        vectors_pooled = x
+        vectors_attended = self.multi_headed_attention.forward(x, x, x)
         
-        vectors_attended = self.multi_headed_attention.forward(vectors_pooled, vectors_pooled, vectors_pooled)
-        
-        vectors_residualized = vectors_pooled + vectors_attended
+        vectors_residualized = x + vectors_attended
         
         vectors_layer_normed = self.layer_normalizer_1.forward(vectors_residualized)
         
@@ -72,16 +69,16 @@ class TransformerEncoder(nn.Module):
 
         return vectors_layer_normed_for_the_second_time
     
+    
     def forward(self, x):
-        vectors = torch.zeros(1, self.emb_dim)
-        for i, text in enumerate(x): 
-            vectors[i] = torch.unsqueeze(self.vectorize(text), 1) # batch_size x seq_len x emb_dim 
-
-        vectors_pooled = self.pool(vectors) # batch_size x emb_dim
-
+        token_fucker = self.tokenizer.encode(x, add_special_tokens=False, return_tensors="pt")[0]
+        vectors = self.embeddings(token_fucker)
+        ped_vectors = self.pe.forward(vectors)
 
         for _ in range(self.n_layers):
-            vectors_pooled = self.encode_this_now(vectors_pooled)
+            ped_vectors = self.encode_this_now(ped_vectors)
+        
+        vectors_pooled = self.pool(ped_vectors) # batch_size x emb_dim
         
         return vectors_pooled
         
@@ -168,46 +165,6 @@ class PositionalEncoding(nn.Module):
 if __name__ == "__main__":
     test = ["the dog ate the cat", "the mouse sucked him off"]
     print(test)
-    model = TransformerEncoder(2, 2, 768, 1024, 1024)
+    model = TransformerEncoder(2, 2, 768, 768, 1024)
     
     print(model.forward(test))
-
-
-
-"""
-A transformer layer consists of: 
-
-Input: X: NxD
-|
-|
-embedding
-|
-positional encoding
-|
-pooling
-|
-|--------------------------|
-|                          | residual connection
-multi-head self-attention  | 
-|                          |
-o--------------------------|
-|
-|
-Layer norm
-|
-|
-|--------------------------|
-|                          | residual connection
-parallel neural netsworks  |
-|         (x N)            |
-|                          |
-o--------------------------|
-|
-|
-Layer norm
-|
-|
-Output
-
-
-"""
