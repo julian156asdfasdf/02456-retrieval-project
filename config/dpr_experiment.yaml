@@ -1,0 +1,19 @@
+defaults:
+  - _self_  # Hydra magic
+  - dataset: fiqa
+  - model: encoder
+
+
+device: gpu
+base_path: "."
+top_k: 10
+lr: 1e-4
+batch_size: 48
+save_dir: 'C:\Users\julia\Desktop\3_semester\deep learning\02456-retrieval-project\outputs\encoder\checkpoints'
+epochs: 50
+
+
+# Keep Hydra in the current directory to ensure relative paths are correct
+hydra:
+  run:
+    dir: "outputs/encoder/"  # Separate directory for evaluation outputs
