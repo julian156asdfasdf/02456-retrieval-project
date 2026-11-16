@@ -7,6 +7,8 @@ import math
 class TransformerEncoder(nn.Module):
     def __init__(self, n_layers: int, n_heads: int, emb_dim: int, hidden_dim: int, feed_forward_dim: int, pooling_type: str, batch_size=32):
         super().__init__()
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
         self.n_layers = n_layers
         self.n_heads = n_heads
         self.emb_dim = emb_dim
@@ -60,9 +62,9 @@ class TransformerEncoder(nn.Module):
     
     
     def forward(self, x):
-        token_dict = self.tokenizer(x, add_special_tokens=True, padding = True, return_tensors="pt")
-        tokens = token_dict["input_ids"] 
-        mask = token_dict["attention_mask"]
+        token_dict = self.tokenizer(x, add_special_tokens=True, padding = True, return_tensors="pt", truncation = True, max_length = 512)
+        tokens = token_dict["input_ids"].to(self.device)
+        mask = token_dict["attention_mask"].to(self.device)
 
         vectors = self.embeddings(tokens)
         ped_vectors = self.pe.forward(vectors)
